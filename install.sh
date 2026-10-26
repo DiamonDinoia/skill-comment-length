@@ -14,16 +14,9 @@ if [ -z "${HOME:-}" ]; then
 fi
 command -v python3 >/dev/null 2>&1 || { echo "install.sh: python3 not found" >&2; exit 1; }
 
-# Claude and Codex run the hook from ~/.claude/hooks, per the shipped JSON shapes.
-mkdir -p "$HOME/.claude/hooks"
-if [ -f "$HOOK_DST" ] && cmp -s "$HOOK_SRC" "$HOOK_DST"; then
-    echo "SKIP  $HOOK_DST (identical)"
-else
-    [ -e "$HOOK_DST" ] && cp "$HOOK_DST" "$HOOK_DST.bak.$(date -u +%Y%m%d%H%M%S)"
-    cp "$HOOK_SRC" "$HOOK_DST"
-    chmod +x "$HOOK_DST"
-    echo "WROTE $HOOK_DST"
-fi
+# Claude and Codex run the hook from ~/.claude/hooks, per the shipped JSON
+# shapes. The copy sits after the config validation pass so a refused run
+# writes nothing.
 
 python3 - <<'PY'
 """Merge the comment-length PostToolUse(Write|Edit) hook into both configs."""
@@ -88,9 +81,7 @@ for path in TARGETS:
     if registered(ptu) or registered(data.get("PostToolUse")):
         plans.append((path, data, "skip"))
     elif not isinstance(ptu, list):
-        print(f"install.sh: {path}: PostToolUse is not a list; leaving it alone",
-              file=sys.stderr)
-        plans.append((path, data, "alone"))
+        die(path, "PostToolUse is not a list")
     else:
         plans.append((path, data, "write"))
 
@@ -98,8 +89,6 @@ for path in TARGETS:
 for path, data, action in plans:
     if action == "skip":
         print(f"SKIP  {path} (hook already registered)")
-        continue
-    if action == "alone":
         continue
     ptu = data.setdefault("hooks", {}).setdefault("PostToolUse", [])
     for entry in ptu:
@@ -120,3 +109,14 @@ for path, data, action in plans:
                    check=True, stdout=subprocess.DEVNULL)
     print(f"WROTE {path}{backup}")
 PY
+
+# Validation passed; copy the hook script into place.
+mkdir -p "$HOME/.claude/hooks"
+if [ -f "$HOOK_DST" ] && cmp -s "$HOOK_SRC" "$HOOK_DST"; then
+    echo "SKIP  $HOOK_DST (identical)"
+else
+    [ -e "$HOOK_DST" ] && cp "$HOOK_DST" "$HOOK_DST.bak.$(date -u +%Y%m%d%H%M%S)"
+    cp "$HOOK_SRC" "$HOOK_DST"
+    chmod +x "$HOOK_DST"
+    echo "WROTE $HOOK_DST"
+fi
