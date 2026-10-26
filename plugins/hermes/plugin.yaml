@@ -1,5 +1,5 @@
 name: comment-length
-version: 0.1.0
+version: 1.0.0
 description: Warns when a write_file or patch call adds a comment line over 100 chars.
 author: Dietrich Gebert
 provides_hooks:

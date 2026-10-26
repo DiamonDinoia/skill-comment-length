@@ -64,11 +64,11 @@ installer left next to each. Remove the plugin path from
 
 ## Layout
 
-- `hook/no-long-comments.py` — the hook, byte-identical to
+- `hook/no-long-comments.py`, the hook, byte-identical to
   `~/.claude/hooks/no-long-comments.py`.
-- `install.sh` — idempotent installer for the two JSON-config harnesses.
-- `plugins/opencode/comment-length.js` — opencode plugin, length rule.
-- `plugins/hermes/` — Hermes plugin (`plugin.yaml`, `__init__.py`),
+- `install.sh`, idempotent installer for the two JSON-config harnesses.
+- `plugins/opencode/comment-length.js`, opencode plugin, length rule.
+- `plugins/hermes/`, Hermes plugin (`plugin.yaml`, `__init__.py`),
   length rule.
 
 ## License
