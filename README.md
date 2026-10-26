@@ -1,6 +1,6 @@
 # skill-comment-length
 
-Reject comment lines over 100 chars when an agent writes or edits code.
+Reject comment lines over `MAX_LEN = 100` chars when an agent writes or edits code.
 
 ## What it does
 
@@ -70,3 +70,7 @@ installer left next to each. Remove the plugin path from
 - `plugins/opencode/comment-length.js` — opencode plugin, length rule.
 - `plugins/hermes/` — Hermes plugin (`plugin.yaml`, `__init__.py`),
   length rule.
+
+## License
+
+MIT. See `LICENSE`.

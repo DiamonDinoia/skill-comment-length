@@ -52,11 +52,19 @@ for path, nested in TARGETS:
         with open(path) as f:
             data = json.load(f)  # malformed JSON aborts before any write
     container = data.setdefault("hooks", {}) if nested else data
+    if not isinstance(container, dict):
+        print(f"install.sh: {path}: hooks is not an object; refusing to edit",
+              file=sys.stderr)
+        sys.exit(2)
     ptu = container.setdefault("PostToolUse", [])
     if not isinstance(ptu, list):
         print(f"install.sh: {path}: PostToolUse is not a list; leaving it alone",
               file=sys.stderr)
         continue
+    if not all(isinstance(entry, dict) for entry in ptu):
+        print(f"install.sh: {path}: PostToolUse entry is not an object; refusing to edit",
+              file=sys.stderr)
+        sys.exit(2)
     already = any(
         COMMAND in hook.get("command", "")
         for entry in ptu if isinstance(entry, dict)
