@@ -51,35 +51,57 @@ def registered(entries):
         for hook in entry.get("hooks", []) if isinstance(hook, dict))
 
 
+def die(path, shape):
+    print(f"install.sh: {path}: {shape}; refusing to edit", file=sys.stderr)
+    sys.exit(2)
+
+
 # Claude settings.json and Codex hooks.json both nest hooks under "hooks".
 TARGETS = [
     os.path.join(HOME, ".claude", "settings.json"),
     os.path.join(HOME, ".codex", "hooks.json"),
 ]
 
+# Pass 1: load and validate every target, so a bad shape cannot leave a
+# partial install behind.
+plans = []
 for path in TARGETS:
     data = {}
     if os.path.exists(path):
         with open(path) as f:
             data = json.load(f)  # malformed JSON aborts before any write
+    if not isinstance(data, dict):
+        die(path, "top level is not an object")
     if "hooks" in data and not isinstance(data["hooks"], dict):
-        print(f"install.sh: {path}: hooks is not an object; refusing to edit",
-              file=sys.stderr)
-        sys.exit(2)
+        die(path, "hooks is not an object")
+    ptu = data.get("hooks", {}).get("PostToolUse", [])
+    if isinstance(ptu, list):
+        if not all(isinstance(entry, dict) for entry in ptu):
+            die(path, "PostToolUse entry is not an object")
+        for entry in ptu:
+            inner = entry.get("hooks", [])
+            if not isinstance(inner, list):
+                die(path, "entry hooks is not a list")
+            if not all(isinstance(hook, dict) for hook in inner):
+                die(path, "entry hooks item is not an object")
     # Older builds wrote a stray top-level PostToolUse; count it, never add it.
-    if (registered(data.get("hooks", {}).get("PostToolUse"))
-            or registered(data.get("PostToolUse"))):
-        print(f"SKIP  {path} (hook already registered)")
-        continue
-    ptu = data.setdefault("hooks", {}).setdefault("PostToolUse", [])
-    if not isinstance(ptu, list):
+    if registered(ptu) or registered(data.get("PostToolUse")):
+        plans.append((path, data, "skip"))
+    elif not isinstance(ptu, list):
         print(f"install.sh: {path}: PostToolUse is not a list; leaving it alone",
               file=sys.stderr)
+        plans.append((path, data, "alone"))
+    else:
+        plans.append((path, data, "write"))
+
+# Pass 2: merge and write.
+for path, data, action in plans:
+    if action == "skip":
+        print(f"SKIP  {path} (hook already registered)")
         continue
-    if not all(isinstance(entry, dict) for entry in ptu):
-        print(f"install.sh: {path}: PostToolUse entry is not an object; refusing to edit",
-              file=sys.stderr)
-        sys.exit(2)
+    if action == "alone":
+        continue
+    ptu = data.setdefault("hooks", {}).setdefault("PostToolUse", [])
     for entry in ptu:
         if entry.get("matcher") == "Write|Edit":
             entry.setdefault("hooks", []).append(dict(HOOK))
