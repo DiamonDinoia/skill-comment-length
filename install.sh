@@ -40,23 +40,38 @@ HOOK = {"type": "command", "command": COMMAND}
 HOME = os.environ["HOME"]
 TS = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M%S")
 
-# (path, nested): Codex keeps its hooks under a top-level "hooks" key.
+
+def registered(entries):
+    """True when any entry already runs the comment-length hook."""
+    if not isinstance(entries, list):
+        return False
+    return any(
+        "no-long-comments.py" in hook.get("command", "")
+        for entry in entries if isinstance(entry, dict)
+        for hook in entry.get("hooks", []) if isinstance(hook, dict))
+
+
+# Claude settings.json and Codex hooks.json both nest hooks under "hooks".
 TARGETS = [
-    (os.path.join(HOME, ".claude", "settings.json"), False),
-    (os.path.join(HOME, ".codex", "hooks.json"), True),
+    os.path.join(HOME, ".claude", "settings.json"),
+    os.path.join(HOME, ".codex", "hooks.json"),
 ]
 
-for path, nested in TARGETS:
+for path in TARGETS:
     data = {}
     if os.path.exists(path):
         with open(path) as f:
             data = json.load(f)  # malformed JSON aborts before any write
-    container = data.setdefault("hooks", {}) if nested else data
-    if not isinstance(container, dict):
+    if "hooks" in data and not isinstance(data["hooks"], dict):
         print(f"install.sh: {path}: hooks is not an object; refusing to edit",
               file=sys.stderr)
         sys.exit(2)
-    ptu = container.setdefault("PostToolUse", [])
+    # Older builds wrote a stray top-level PostToolUse; count it, never add it.
+    if (registered(data.get("hooks", {}).get("PostToolUse"))
+            or registered(data.get("PostToolUse"))):
+        print(f"SKIP  {path} (hook already registered)")
+        continue
+    ptu = data.setdefault("hooks", {}).setdefault("PostToolUse", [])
     if not isinstance(ptu, list):
         print(f"install.sh: {path}: PostToolUse is not a list; leaving it alone",
               file=sys.stderr)
@@ -65,13 +80,6 @@ for path, nested in TARGETS:
         print(f"install.sh: {path}: PostToolUse entry is not an object; refusing to edit",
               file=sys.stderr)
         sys.exit(2)
-    already = any(
-        COMMAND in hook.get("command", "")
-        for entry in ptu if isinstance(entry, dict)
-        for hook in entry.get("hooks", []) if isinstance(hook, dict))
-    if already:
-        print(f"SKIP  {path} (hook already registered)")
-        continue
     for entry in ptu:
         if entry.get("matcher") == "Write|Edit":
             entry.setdefault("hooks", []).append(dict(HOOK))
@@ -84,7 +92,7 @@ for path, nested in TARGETS:
         shutil.copy2(path, f"{path}.bak.{TS}")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
     subprocess.run([sys.executable, "-m", "json.tool", path],
                    check=True, stdout=subprocess.DEVNULL)
