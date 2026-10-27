@@ -68,20 +68,19 @@ for path in TARGETS:
     if "hooks" in data and not isinstance(data["hooks"], dict):
         die(path, "hooks is not an object")
     ptu = data.get("hooks", {}).get("PostToolUse", [])
-    if isinstance(ptu, list):
-        if not all(isinstance(entry, dict) for entry in ptu):
-            die(path, "PostToolUse entry is not an object")
-        for entry in ptu:
-            inner = entry.get("hooks", [])
-            if not isinstance(inner, list):
-                die(path, "entry hooks is not a list")
-            if not all(isinstance(hook, dict) for hook in inner):
-                die(path, "entry hooks item is not an object")
+    if not isinstance(ptu, list):
+        die(path, "PostToolUse is not a list")
+    if not all(isinstance(entry, dict) for entry in ptu):
+        die(path, "PostToolUse entry is not an object")
+    for entry in ptu:
+        inner = entry.get("hooks", [])
+        if not isinstance(inner, list):
+            die(path, "entry hooks is not a list")
+        if not all(isinstance(hook, dict) for hook in inner):
+            die(path, "entry hooks item is not an object")
     # Older builds wrote a stray top-level PostToolUse; count it, never add it.
     if registered(ptu) or registered(data.get("PostToolUse")):
         plans.append((path, data, "skip"))
-    elif not isinstance(ptu, list):
-        die(path, "PostToolUse is not a list")
     else:
         plans.append((path, data, "write"))
 
